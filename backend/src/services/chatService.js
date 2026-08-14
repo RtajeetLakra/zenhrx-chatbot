@@ -150,48 +150,31 @@ class ChatService {
 
     return triggers.some((t) => lower.includes(t));
   }
-
-  /**
-   * Get an existing conversation or create a new one
-   */
   static async getSession(token) {
+    const sessionToken = token || require('crypto').randomUUID();
+
     const res = await db.query(
-      'SELECT * FROM conversations WHERE session_token = $1',
-      [token]
+      'SELECT * FROM conversations WHERE session_id = $1',
+      [sessionToken]
     );
 
     if (res.rows.length > 0) {
       return {
         ...res.rows[0],
+        sessionToken,
         state: res.rows[0].state || this.STATES.IDLE
       };
     }
 
-    // Create new session
     const insertRes = await db.query(
-      "INSERT INTO conversations (session_token, status) VALUES ($1, 'ACTIVE') RETURNING *",
-      [token]
+      'INSERT INTO conversations (session_id, status) VALUES ($1, \'ACTIVE\') RETURNING *',
+      [sessionToken]
     );
-
-    // Ensure state/context columns exist
-    try {
-      await db.query(
-        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS state VARCHAR(50) DEFAULT 'IDLE'"
-      );
-
-      await db.query(
-        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS context JSONB DEFAULT '{}'"
-      );
-    } catch (error) {
-      console.error(
-        'Unable to ensure conversation state/context columns:',
-        error.message
-      );
-    }
 
     return {
       ...insertRes.rows[0],
-      state: this.STATES.IDLE
+      sessionToken,
+      state: insertRes.rows[0].state || this.STATES.IDLE
     };
   }
 
@@ -220,13 +203,13 @@ class ChatService {
     }
 
     await db.query(
-      'UPDATE conversations SET state = $1 WHERE session_token = $2',
+      'UPDATE conversations SET state = $1 WHERE session_id = $2',
       [newState, token]
     );
 
     if (clear) {
       await db.query(
-        "UPDATE conversations SET context = '{}'::jsonb WHERE session_token = $1",
+        "UPDATE conversations SET context = '{}'::jsonb WHERE session_id = $1",
         [token]
       );
 
@@ -239,7 +222,7 @@ class ChatService {
       Object.keys(leadData).length > 0
     ) {
       await db.query(
-        "UPDATE conversations SET context = COALESCE(context, '{}'::jsonb) || $1::jsonb WHERE session_token = $2",
+        "UPDATE conversations SET context = COALESCE(context, '{}'::jsonb) || $1::jsonb WHERE session_id = $2",
         [JSON.stringify(leadData), token]
       );
     }
@@ -250,7 +233,7 @@ class ChatService {
    */
   static async getSessionContext(token) {
     const res = await db.query(
-      'SELECT context FROM conversations WHERE session_token = $1',
+      'SELECT context FROM conversations WHERE session_id = $1',
       [token]
     );
 
@@ -286,7 +269,7 @@ class ChatService {
     }
 
     const context = await this.getSessionContext(
-      session.session_token
+      session.session_id
     );
 
     let responseText;
@@ -318,7 +301,7 @@ class ChatService {
         }
 
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.AWAITING_COMPANY,
           { name }
         );
@@ -344,7 +327,7 @@ class ChatService {
         }
 
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.AWAITING_EMAIL,
           { company }
         );
@@ -373,7 +356,7 @@ class ChatService {
         }
 
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.AWAITING_MOBILE,
           { email }
         );
@@ -411,7 +394,7 @@ class ChatService {
         }
 
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.AWAITING_EMPLOYEES,
           { mobile }
         );
@@ -448,7 +431,7 @@ class ChatService {
         }
 
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.AWAITING_REQUIREMENT,
           { employeeCount }
         );
@@ -474,7 +457,7 @@ class ChatService {
         }
 
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.AWAITING_TIME,
           { requirement }
         );
@@ -530,7 +513,7 @@ class ChatService {
 
         // Mark conversation as completed
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.COMPLETED,
           {},
           true
@@ -538,8 +521,8 @@ class ChatService {
 
         // Link lead to conversation
         await db.query(
-          'UPDATE conversations SET lead_id = $1 WHERE session_token = $2',
-          [lead.id, session.session_token]
+          'UPDATE conversations SET lead_id = $1 WHERE session_id = $2',
+          [lead.id, session.session_id]
         );
 
         responseText =
@@ -560,7 +543,7 @@ class ChatService {
         );
 
         await this.updateSessionState(
-          session.session_token,
+          session.session_id,
           this.STATES.IDLE,
           {},
           true
@@ -590,7 +573,7 @@ class ChatService {
         'Lead flow attempted to return an empty response.',
         {
           state: session.state,
-          sessionToken: session.session_token
+          sessionToken: session.session_id
         }
       );
 
@@ -659,14 +642,14 @@ class ChatService {
 
     await db.query(
       `INSERT INTO messages
-        (
-          conversation_id,
-          sender,
-          content,
-          confidence_score,
-          source
-        )
-       VALUES ($1, $2, $3, $4, $5)`,
+  (
+      conversation_id,
+      sender,
+      message,
+      confidence_score,
+      response_source
+  )
+  VALUES ($1, $2, $3, $4, $5)`,
       [
         session.id,
         sender,

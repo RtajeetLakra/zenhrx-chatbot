@@ -43,11 +43,11 @@ router.get('/unanswered', authenticateAdmin, async (req, res, next) => {
   try {
     const db = require('../config/database');
     const result = await db.query(`
-      SELECT m.id, m.content as message, m.timestamp, c.session_token
+      SELECT m.id, m.message, m.created_at AS timestamp, c.session_id
       FROM messages m
       JOIN conversations c ON m.conversation_id = c.id
       WHERE m.source = 'FALLBACK' AND m.sender = 'bot'
-      ORDER BY m.timestamp DESC
+      ORDER BY m.created_at DESC
     `);
     // Wait, the FALLBACK is on the bot's response. The user's question is the previous message in the same conversation.
     // Let's get messages where the bot answered with FALLBACK, and join the preceding user message.
