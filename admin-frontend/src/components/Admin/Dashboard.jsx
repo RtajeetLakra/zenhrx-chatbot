@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import KnowledgeManager from './KnowledgeManager';
 import LeadTracker from './LeadTracker';
+import ConversationManager from './ConversationManager';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('knowledge');
@@ -58,7 +59,7 @@ const Dashboard = () => {
     <div className="admin-layout">
       <div className="admin-sidebar">
         <h2 style={{ color: 'var(--primary-color)', marginBottom: '32px' }}>HRMS Admin</h2>
-        
+
         <div style={{ marginBottom: '24px' }}>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Leads</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{stats.leads}</div>
@@ -69,19 +70,39 @@ const Dashboard = () => {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button 
+          <button
             onClick={() => setActiveTab('knowledge')}
             style={{ padding: '12px', textAlign: 'left', background: activeTab === 'knowledge' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'knowledge' ? 'white' : 'inherit', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
           >
             Knowledge Base
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('leads')}
             style={{ padding: '12px', textAlign: 'left', background: activeTab === 'leads' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'leads' ? 'white' : 'inherit', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
           >
             Lead Management
           </button>
-          <button 
+          <button
+            onClick={() => setActiveTab('conversations')}
+            style={{
+              padding: '12px',
+              textAlign: 'left',
+              background:
+                activeTab === 'conversations'
+                  ? 'var(--primary-color)'
+                  : 'transparent',
+              color:
+                activeTab === 'conversations'
+                  ? 'white'
+                  : 'inherit',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            Conversation History
+          </button>
+          <button
             onClick={() => { setToken(''); localStorage.removeItem('adminToken'); }}
             style={{ padding: '12px', textAlign: 'left', background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', marginTop: 'auto' }}
           >
@@ -89,10 +110,19 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
-      
+
       <div className="admin-content">
-        {activeTab === 'knowledge' && <KnowledgeManager token={token} />}
-        {activeTab === 'leads' && <LeadTracker token={token} />}
+        {activeTab === 'knowledge' && (
+          <KnowledgeManager token={token} />
+        )}
+
+        {activeTab === 'leads' && (
+          <LeadTracker token={token} />
+        )}
+
+        {activeTab === 'conversations' && (
+          <ConversationManager token={token} />
+        )}
       </div>
     </div>
   );

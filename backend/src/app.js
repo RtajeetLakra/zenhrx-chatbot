@@ -12,45 +12,58 @@ const leadRoutes = require('./routes/leads');
 
 const app = express();
 
-// Middlewares
-app.use(helmet());
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5174'
-];
+// ============================================================
+// MIDDLEWARE
+// ============================================================
 
+app.use(helmet());
+
+// Allow the local React frontends to communicate with the API.
+// This handles normal requests as well as browser OPTIONS
+// preflight requests.
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error('Not allowed by CORS'));
-    }
+    origin: [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5174'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
+
+
+
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Routes
+// ============================================================
+// ROUTES
+// ============================================================
+
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/leads', leadRoutes);
 
-// Base route
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Chatbot API is running' });
+  res.status(200).json({
+    status: 'ok',
+    message: 'Chatbot API is running'
+  });
 });
 
-// Error handling middleware
+// ============================================================
+// ERROR HANDLING
+// ============================================================
+
 app.use(errorHandler);
 
 module.exports = app;

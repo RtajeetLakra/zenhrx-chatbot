@@ -42,27 +42,39 @@ const { authenticateAdmin } = require('../middlewares/auth');
 router.get('/unanswered', authenticateAdmin, async (req, res, next) => {
   try {
     const db = require('../config/database');
-    const result = await db.query(`
-      SELECT m.id, m.message, m.created_at AS timestamp, c.session_id
-      FROM messages m
-      JOIN conversations c ON m.conversation_id = c.id
-      WHERE m.source = 'FALLBACK' AND m.sender = 'bot'
-      ORDER BY m.created_at DESC
-    `);
-    // Wait, the FALLBACK is on the bot's response. The user's question is the previous message in the same conversation.
-    // Let's get messages where the bot answered with FALLBACK, and join the preceding user message.
-    // A simpler way: when we log FALLBACK, it's the bot. The unanswered query is the user's message right before it.
-    // Let's just do a simpler query: select the user message right before the fallback.
+
     const query = `
-      SELECT m1.content as user_message, m1.timestamp, m2.confidence_score
-      FROM messages m1
-      JOIN messages m2 ON m1.conversation_id = m2.conversation_id AND m1.id = m2.id - 1
-      WHERE m2.source = 'FALLBACK' AND m1.sender = 'user'
-      ORDER BY m1.timestamp DESC
+      SELECT
+        user_msg.id,
+        user_msg.message AS user_message,
+        user_msg.created_at AS timestamp,
+        fallback_msg.confidence_score,
+        fallback_msg.response_source
+      FROM messages AS fallback_msg
+      JOIN LATERAL (
+        SELECT
+          m.id,
+          m.message,
+          m.created_at
+        FROM messages AS m
+        WHERE
+          m.conversation_id = fallback_msg.conversation_id
+          AND m.sender = 'user'
+          AND m.created_at < fallback_msg.created_at
+        ORDER BY m.created_at DESC
+        LIMIT 1
+      ) AS user_msg ON true
+      WHERE
+        fallback_msg.sender = 'bot'
+        AND fallback_msg.response_source = 'FALLBACK'
+      ORDER BY user_msg.created_at DESC;
     `;
-    const fallbackResults = await db.query(query);
-    res.json(fallbackResults.rows);
+
+    const result = await db.query(query);
+
+    res.json(result.rows);
   } catch (error) {
+    console.error('Failed to fetch unanswered queries:', error);
     next(error);
   }
 });
